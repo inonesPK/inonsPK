@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ULTIMATE VS | 究極對決</title>
+    <style>
+        :root {
+            --blue: #00f2ff;
+            --red: #ff0055;
+            --win: #39ff14;
+            --bg: #050505;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 頂部背景光暈 */
+        .glow-bg {
+            position: fixed;
+            top: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 20% 30%, #1e1b4b 0%, transparent 50%),
+                        radial-gradient(circle at 80% 70%, #450a0a 0%, transparent 50%);
+            z-index: -1;
+            opacity: 0.6;
+        }
+
+        h1 {
+            margin-top: 30px;
+            letter-spacing: 8px;
+            text-shadow: 0 0 20px var(--blue);
+            font-style: italic;
+        }
+
+        /* 對決容器 */
+        .arena {
+            display: flex;
+            width: 90%;
+            max-width: 1200px;
+            height: 70vh;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            perspective: 1000px;
+        }
+
+        .fighter-card {
+            flex: 1;
+            height: 450px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+        }
+
+        .fighter-card.blue-side { border-top: 5px solid var(--blue); box-shadow: 0 0 30px rgba(0, 242, 255, 0.1); }
+        .fighter-card.red-side { border-top: 5px solid var(--red); box-shadow: 0 0 30px rgba(255, 0, 85, 0.1); }
+
+        /* 當勝出時的發光效果 */
+        .winner-aura {
+            border: 2px solid var(--win) !important;
+            box-shadow: 0 0 60px rgba(57, 255, 20, 0.4) !important;
+            transform: scale(1.05);
+        }
+
+        .input-area { width: 100%; margin-bottom: 20px; }
+        input {
+            width: 100%;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.1rem;
+            text-align: center;
+            outline: none;
+        }
+
+        /* 數值條 */
+        .stat-container { width: 100%; margin-top: 20px; }
+        .stat-label { font-size: 0.8rem; color: #888; display: flex; justify-content: space-between; }
+        .stat-bar { height: 6px; background: #222; border-radius: 3px; margin: 5px 0 15px 0; overflow: hidden; }
+        .stat-fill { height: 100%; width: 0%; transition: 1.5s cubic-bezier(0.1, 0.5, 0.1, 1); }
+        .blue-side .stat-fill { background: var(--blue); box-shadow: 0 0 10px var(--blue); }
+        .red-side .stat-fill { background: var(--red); box-shadow: 0 0 10px var(--red); }
+
+        /* VS 按鈕 */
+        .vs-center { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .vs-text { font-size: 4rem; font-weight: 900; color: #333; font-style: italic; }
+        .battle-btn {
+            background: white; color: black; border: none;
+            padding: 20px 50px; font-size: 1.5rem; font-weight: 900;
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+            cursor: pointer; transition: 0.3s;
+        }
+        .battle-btn:hover { transform: scale(1.2); background: var(--win); }
+
+        .summary-box {
+            position: fixed; bottom: 50px;
+            background: rgba(0,0,0,0.8); padding: 20px; border-radius: 20px;
+            border: 1px solid var(--win); opacity: 0; transition: 0.5s;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glow-bg"></div>
+    <h1>BATTLE ARENA</h1>
+
+    <div class="arena">
+        <div class="fighter-card blue-side" id="card-a">
+            <div class="input-area">
+                <input type="text" id="name-a" placeholder="輸入產品 A...">
+            </div>
+            <div class="stat-container" id="stats-a">
+                </div>
+        </div>
+
+        <div class="vs-center">
+            <div class="vs-text">VS</div>
+            <button class="battle-btn" onclick="runBattle()">BATTLE</button>
+        </div>
+
+        <div class="fighter-card red-side" id="card-b">
+            <div class="input-area">
+                <input type="text" id="name-b" placeholder="輸入產品 B...">
+            </div>
+            <div class="stat-container" id="stats-b">
+                </div>
+        </div>
+    </div>
+
+    <div class="summary-box" id="summary">
+        戰鬥結果：<span id="result-text">等待指令中...</span>
+    </div>
+
+    <script>
+        const statsNames = ["效能速度", "視覺設計", "電池續航", "CP值"];
+
+        // 初始化進度條
+        function init() {
+            [ 'stats-a', 'stats-b' ].forEach(id => {
+                const container = document.getElementById(id);
+                statsNames.forEach(name => {
+                    container.innerHTML += `
+                        <div class="stat-label"><span>${name}</span><span class="val">0</span></div>
+                        <div class="stat-bar"><div class="stat-fill"></div></div>
+                    `;
+                });
+            });
+        }
+
+        async function runBattle() {
+            const nameA = document.getElementById('name-a').value || "戰士 A";
+            const nameB = document.getElementById('name-b').value || "戰士 B";
+            
+            // 重置狀態
+            document.querySelectorAll('.fighter-card').forEach(c => c.classList.remove('winner-aura'));
+            document.getElementById('summary').style.opacity = 0;
+
+            // 模擬 AI 運算延遲
+            document.querySelector('.battle-btn').innerText = "SCANNING...";
+            
+            setTimeout(() => {
+                // 隨機生成數值 (實際開發時會串接 AI API)
+                const dataA = [80 + Math.random()*20, 70 + Math.random()*30, 60 + Math.random()*40, 50 + Math.random()*50];
+                const dataB = [80 + Math.random()*20, 70 + Math.random()*30, 60 + Math.random()*40, 50 + Math.random()*50];
+                
+                updateStats('stats-a', dataA);
+                updateStats('stats-b', dataB);
+
+                // 判定勝者
+                const sumA = dataA.reduce((a,b) => a+b);
+                const sumB = dataB.reduce((a,b) => a+b);
+                const winner = sumA > sumB ? 'card-a' : 'card-b';
+                const winnerName = sumA > sumB ? nameA : nameB;
+
+                document.getElementById(winner).classList.add('winner-aura');
+                document.getElementById('summary').style.opacity = 1;
+                document.getElementById('result-text').innerText = `${winnerName} 在這場對決中勝出！`;
+                document.querySelector('.battle-btn').innerText = "BATTLE";
+            }, 1000);
+        }
+
+        function updateStats(containerId, data) {
+            const fills = document.getElementById(containerId).querySelectorAll('.stat-fill');
+            const vals = document.getElementById(containerId).querySelectorAll('.val');
+            fills.forEach((fill, i) => {
+                fill.style.width = data[i] + '%';
+                vals[i].innerText = Math.round(data[i]);
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
